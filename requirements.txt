@@ -1,0 +1,10 @@
+streamlit
+vosk
+soundfile
+numpy
+pandas
+langchain_google_genai
+python-dotenv
+yt-dlp
+validators
+langchain_community
