@@ -11,10 +11,10 @@ import google.generativeai as genai
 SetLogLevel(-1)
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 
-DEFAULT_MODEL_PATH = r"D:\sudesh\BASH AI\vosk-model-small-en-us-0.15"
+DEFAULT_MODEL_PATH = r"vosk-model-small-en-us-0.15"
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
