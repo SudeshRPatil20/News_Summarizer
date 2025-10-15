@@ -13,3 +13,4 @@ unstructured
 youtube-transcript-api
 pytube
 pydub
+google-genai
