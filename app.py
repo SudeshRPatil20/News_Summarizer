@@ -10,6 +10,7 @@ from vosk import Model, KaldiRecognizer, SetLogLevel
 import google.genai as genai
 from pathlib import Path
 from pydub import AudioSegment
+import google.generativeai as genaii
 
 SetLogLevel(-1)
 OUTPUT_DIR = Path("outputs")
@@ -20,7 +21,7 @@ st.title("📺 Fox News Monitor Agent")
 
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
+    genaii.configure(api_key=GOOGLE_API_KEY)
 
 st.sidebar.header("Settings")
 video_url = st.sidebar.text_input("Enter Fox News video stream/file path", "")
