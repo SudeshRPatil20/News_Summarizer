@@ -9,9 +9,8 @@ import re
 import google.generativeai as genai
 
 SetLogLevel(-1)
-
 load_dotenv()
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 DEFAULT_MODEL_PATH = r"vosk-model-small-en-us-0.15"
@@ -19,24 +18,26 @@ OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 st.set_page_config(page_title="Audio / YouTube / Website Summarizer", layout="wide")
-st.title("📺 Audio / YouTube / Website Summarizer (Vosk + Google AI / Local)")
+st.title("📺 Audio / YouTube / Website Summarizer (Vosk + Gemini)")
 
 st.sidebar.header("Settings")
 model_path = st.sidebar.text_input("Vosk Model Path", DEFAULT_MODEL_PATH)
 max_summary_sentences = st.sidebar.number_input("Max sentences in summary", min_value=1, max_value=10, value=3)
 
-st.subheader("Input Options")
 audio_file = st.file_uploader("🎧 Upload audio file (WAV/MP3)", type=["wav", "mp3"])
 youtube_url = st.text_input("📹 Or enter YouTube URL")
 website_url = st.text_input("🌐 Or enter Website URL (e.g. news article)")
 
-def summarize_with_google(transcript: str, max_sentences: int = 3) -> str:
+def summarize_with_gemini(transcript: str, max_sentences: int = 3) -> str:
     prompt = f"Summarize the following text in at most {max_sentences} sentences:\n\n{transcript}"
-    response = genai.chat.create(
-        model="gemini-flash-latest",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.last.response
+    try:
+        response = genai.responses.create(
+            model="gemini-flash-latest",
+            input=prompt
+        )
+        return response.output_text
+    except Exception as e:
+        return f"(Summary failed: {e})"
 
 def summarize_locally(text, max_sentences=3):
     sentences = re.split(r'(?<=[.!?]) +', text)
@@ -82,37 +83,31 @@ if st.button("🔍 Generate Summary"):
     transcript = ""
 
     if audio_file:
-        st.info("Processing uploaded audio file...")
         audio_path = OUTPUT_DIR / audio_file.name
         with open(audio_path, "wb") as f:
             f.write(audio_file.read())
-        with st.spinner("Transcribing audio with Vosk..."):
-            try:
-                transcript = transcribe_audio(audio_path, model)
-            except Exception as e:
-                st.error(f"Audio transcription failed: {e}")
+        try:
+            transcript = transcribe_audio(audio_path, model)
+        except Exception as e:
+            st.error(f"Audio transcription failed: {e}")
 
     elif youtube_url.strip():
         try:
             from langchain_community.document_loaders import YoutubeLoader
-            st.info("Fetching YouTube transcript...")
             yt_url = normalize_youtube_url(youtube_url)
             loader = YoutubeLoader.from_youtube_url(yt_url, add_video_info=True, language="en")
-            with st.spinner("Loading YouTube transcript..."):
-                docs = loader.load()
-                transcript = " ".join([doc.page_content for doc in docs])
+            docs = loader.load()
+            transcript = " ".join([doc.page_content for doc in docs])
         except Exception as e:
             st.error(f"Failed to fetch YouTube transcript: {e}")
 
     elif website_url.strip():
         try:
             from langchain_community.document_loaders import UnstructuredURLLoader
-            st.info("Extracting website text...")
             if validators.url(website_url):
                 loader = UnstructuredURLLoader(urls=[website_url])
-                with st.spinner("Loading website content..."):
-                    docs = loader.load()
-                    transcript = " ".join([doc.page_content for doc in docs])[:10000]
+                docs = loader.load()
+                transcript = " ".join([doc.page_content for doc in docs])[:10000]
             else:
                 st.error("Invalid URL format")
         except Exception as e:
@@ -124,20 +119,28 @@ if st.button("🔍 Generate Summary"):
     st.subheader("Transcript (preview)")
     if transcript:
         st.write(transcript[:1000] + "..." if len(transcript) > 1000 else transcript)
+        try:
+            if GOOGLE_API_KEY:
+                summary = summarize_with_gemini(transcript, max_summary_sentences)
+            else:
+                summary = summarize_locally(transcript, max_summary_sentences)
+            st.subheader("Summary")
+            st.write(summary)
+            timestamp = str(int(st.time()))
+            record = {
+                "transcript": transcript,
+                "summary": summary,
+                "audio_file": audio_file.name if audio_file else "",
+                "youtube_url": youtube_url,
+                "website_url": website_url
+            }
+            json_path = OUTPUT_DIR / f"{timestamp}.json"
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            st.error(f"Error generating summary: {e}")
+            summary = summarize_locally(transcript, max_summary_sentences)
+            st.subheader("Summary (Local fallback)")
+            st.write(summary)
     else:
         st.warning("Transcript is empty. Cannot generate summary.")
-
-    st.info("Generating summary...")
-    try:
-        if GOOGLE_API_KEY:
-            summary = summarize_with_google(transcript, max_summary_sentences)
-        else:
-            summary = summarize_locally(transcript, max_summary_sentences)
-        st.subheader("Summary")
-        st.write(summary)
-    except Exception as e:
-        st.error(f"Error generating summary: {e}")
-        summary = summarize_locally(transcript, max_summary_sentences)
-        st.subheader("Summary (Local fallback)")
-        st.write(summary)
-
