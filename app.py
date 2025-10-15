@@ -7,7 +7,7 @@ import json
 import time
 from datetime import datetime
 from vosk import Model, KaldiRecognizer, SetLogLevel
-import google.generativeai as genai
+import google.genai as genai
 from pathlib import Path
 from pydub import AudioSegment
 
