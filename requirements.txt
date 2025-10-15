@@ -11,3 +11,4 @@ langchain_community
 google-generativeai
 unstructured
 youtube-transcript-api
+pytube
